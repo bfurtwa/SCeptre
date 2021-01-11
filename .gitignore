@@ -1,0 +1,10 @@
+.idea/
+.ipynb_checkpoints
+
+# Python build files
+__pycache__/
+/dist/
+/build/
+/sceptre.egg-info/
+/*-env/
+/env-*/
