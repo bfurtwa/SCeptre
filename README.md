@@ -27,7 +27,7 @@ Usage is exemplified in the notebooks for the analysis from the mansucript "Quan
 The analysis can be replicated using the provided conda environment:
 
 ```
-conda env create -f Schoof_et_al/code/environment.yml`
+conda env create -f Schoof_et_al/code/environment.yml
 conda activate sceptre
 pip install Schoof_et_al/code/sceptre-0.1-py3-none-any.whl
 ```
@@ -36,7 +36,8 @@ The required data can be downloaded from
 http://proteomecentral.proteomexchange.org
 using the dataset identifier PXD020586
 
-Find the notebooks in the subdirectory `Schoof_et_al/code` and the place the required data in `Schoof_et_al/data`.
+Find the notebooks in the subdirectory `Schoof_et_al/code`, place the required data in `Schoof_et_al/data`, and create the folder `Schoof_et_al/results/tmp/`.
+
 
 The following notebooks process the different datasets:
 
