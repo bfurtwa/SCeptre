@@ -1153,6 +1153,10 @@ def find_embedding_params(
             if 0 in ad.X:
                 impute(ad, n_neighbors=i_knn)
             sc.pp.scale(ad)
+            # scale can introduce nan genes, remove if there
+            if np.isnan(ad.X).any():
+                retain = [p for p in ad.var.index if not (p in ad.var.index[list(set(np.where(np.isnan(ad.X))[1]))])]
+                ad = ad[:, retain].copy()
             sc.pp.pca(ad)
             for e_knn in embedding_knn:
                 sc.pp.neighbors(ad, n_neighbors=e_knn)
