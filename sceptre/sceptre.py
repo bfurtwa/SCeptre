@@ -638,6 +638,7 @@ def calculate_cell_filter(
     adata: AnnData,
     min_proteins: int = 500,
     thresh_sum: float = 3,
+    plot_qc: bool = True,
     scatter_labels: Tuple[str, str] = ("Channel", "Sorted Population"),
     figsizes: Tuple[Tuple[float, float], Tuple[float, float]] = (
         (figwd, 4.5),
@@ -646,7 +647,7 @@ def calculate_cell_filter(
 ):
     """Calculate the cell filtering based on defined thresholds.
     Thresholds control MAD-based outlier detection.
-    Shows diagnostic plots.
+    Optionally shows diagnostic plots.
 
     Parameters
     ----------
@@ -656,13 +657,15 @@ def calculate_cell_filter(
         The minimum number of proteins per cell
     thresh_sum
         The threshold for the Log2 Sum S/N per cell
+    plot_qc
+        Whether to show quality control plots
     scatter_labels
         The labels to use for the two scatterplots.
     figsizes
         Figure sizes for both figures
     Returns
     -------
-    A list of two :class:`~matplotlib.figure` objects.
+    A list of two :class:`~matplotlib.figure` objects if plot_qc==True.
 
     Updates `adata` with the following fields.
 
@@ -716,79 +719,80 @@ def calculate_cell_filter(
             (len(adata.obs) - adata.obs["Pass Cell Filter"].sum()), len(adata.obs)
         )
     )
+    
+    if plot_qc:
+        fig_objects = []
+        # plot qc params for each cell
+        gridspec = dict(
+            hspace=0.0, height_ratios=[1, 1, 0.5, 1, 1]
+        )  # invisible axis for title between axes
+        fig, axs = plt.subplots(nrows=5, ncols=1, figsize=figsizes[0], gridspec_kw=gridspec)
+        labels = ["Log2 Sum S/N", "Num Proteins"]
+        colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+        for i, l in enumerate(labels):
+            ax = axs[i]
+            adata.obs[l].plot(ax=ax, grid=True, color=colors[i])
+            ax.set_ylabel(l)
+            ax.legend().remove()
+            if i == 0:
+                ax.set_title("Cells before filtering")
+                ax.axhline(sum_sn_max, color="black", linestyle="--")
+                ax.axhline(sum_sn_min, color="black", linestyle="--")
+                ax.xaxis.set_ticklabels([])
+            if i == 1:
+                ax.axhline(min_proteins, color="black", linestyle="--")
 
-    fig_objects = []
-    # plot qc params for each cell
-    gridspec = dict(
-        hspace=0.0, height_ratios=[1, 1, 0.5, 1, 1]
-    )  # invisible axis for title between axes
-    fig, axs = plt.subplots(nrows=5, ncols=1, figsize=figsizes[0], gridspec_kw=gridspec)
-    labels = ["Log2 Sum S/N", "Num Proteins"]
-    colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-    for i, l in enumerate(labels):
-        ax = axs[i]
-        adata.obs[l].plot(ax=ax, grid=True, color=colors[i])
-        ax.set_ylabel(l)
-        ax.legend().remove()
-        if i == 0:
-            ax.set_title("Cells before filtering")
-            ax.axhline(sum_sn_max, color="black", linestyle="--")
-            ax.axhline(sum_sn_min, color="black", linestyle="--")
-            ax.xaxis.set_ticklabels([])
-        if i == 1:
-            ax.axhline(min_proteins, color="black", linestyle="--")
+        axs[2].set_visible(False)
 
-    axs[2].set_visible(False)
+        # plot after filter
+        for i, l in enumerate(labels):
+            ax = axs[i + 3]
+            adata.obs.loc[adata.obs["Pass Cell Filter"], l].plot(
+                ax=ax, grid=True, color=colors[i]
+            )
+            if i == 0:
+                ax.set_title("Cells after filtering")
+                ax.xaxis.set_ticklabels([])
+            ax.set_ylabel(labels[i])
+            ax.legend().remove()
+        ax.set_xlabel("Cell index")
+        fig.tight_layout()
+        fig_objects.append(fig)
 
-    # plot after filter
-    for i, l in enumerate(labels):
-        ax = axs[i + 3]
-        adata.obs.loc[adata.obs["Pass Cell Filter"], l].plot(
-            ax=ax, grid=True, color=colors[i]
+        # scatterplots
+        fig, axs = plt.subplots(nrows=1, ncols=2, figsize=figsizes[1])
+        sc.pl.scatter(
+            adata,
+            x="Log2 Sum S/N",
+            y="Num Proteins",
+            color=scatter_labels[0],
+            size=cellsize,
+            show=False,
+            title="Cell filter by Channel",
+            ax=axs[0],
         )
-        if i == 0:
-            ax.set_title("Cells after filtering")
-            ax.xaxis.set_ticklabels([])
-        ax.set_ylabel(labels[i])
-        ax.legend().remove()
-    ax.set_xlabel("Cell index")
-    fig.tight_layout()
-    fig_objects.append(fig)
+        axs[0].axvline(sum_sn_max, color="black", linestyle="--")
+        axs[0].axvline(sum_sn_min, color="black", linestyle="--")
+        axs[0].axhline(min_proteins, color="black", linestyle="--")
 
-    # scatterplots
-    fig, axs = plt.subplots(nrows=1, ncols=2, figsize=figsizes[1])
-    sc.pl.scatter(
-        adata,
-        x="Log2 Sum S/N",
-        y="Num Proteins",
-        color=scatter_labels[0],
-        size=cellsize,
-        show=False,
-        title="Cell filter by Channel",
-        ax=axs[0],
-    )
-    axs[0].axvline(sum_sn_max, color="black", linestyle="--")
-    axs[0].axvline(sum_sn_min, color="black", linestyle="--")
-    axs[0].axhline(min_proteins, color="black", linestyle="--")
+        sc.pl.scatter(
+            adata,
+            x="Log2 Sum S/N",
+            y="Num Proteins",
+            color=scatter_labels[1],
+            size=cellsize,
+            show=False,
+            title="Cell filter by Population",
+            ax=axs[1],
+        )
+        axs[1].axvline(sum_sn_max, color="black", linestyle="--")
+        axs[1].axvline(sum_sn_min, color="black", linestyle="--")
+        axs[1].axhline(min_proteins, color="black", linestyle="--")
+        fig.tight_layout()
 
-    sc.pl.scatter(
-        adata,
-        x="Log2 Sum S/N",
-        y="Num Proteins",
-        color=scatter_labels[1],
-        size=cellsize,
-        show=False,
-        title="Cell filter by Population",
-        ax=axs[1],
-    )
-    axs[1].axvline(sum_sn_max, color="black", linestyle="--")
-    axs[1].axvline(sum_sn_min, color="black", linestyle="--")
-    axs[1].axhline(min_proteins, color="black", linestyle="--")
-    fig.tight_layout()
+        fig_objects.append(fig)
 
-    fig_objects.append(fig)
-
-    return fig_objects
+        return fig_objects
 
 
 def apply_cell_filter(adata: AnnData, min_cells: int = 3):
