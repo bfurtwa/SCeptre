@@ -1627,13 +1627,14 @@ def enrichment_test(
     adata: AnnData,
     gene_set: Sequence[str],
     categories: Sequence[str],
+    background: Union[pd.DataFrame, None] = None,
     sep: str = ";",
     key: str = "enrichment_test",
     pval_thesh: float = 0.05,
     use_raw: bool = True,
 ):
     """Perform a term enrichment test on the selected genes in selected term category.
-    All genes in the matrix are used as background.
+    If no background is provided, all genes in the matrix are used as background.
 
     Parameters
     ----------
@@ -1641,6 +1642,8 @@ def enrichment_test(
         The annotated data matrix.
     gene_set
         Genes to be tested against the background.
+    background
+        Dataframe of genes in the rows and categories in the columns.
     categories
         The names of the variables in `adata.var` that store the term annotations.
         E.g. `'Biological Process'`.
@@ -1674,6 +1677,8 @@ def enrichment_test(
             .astype(str)[~(ad.var[cat] == "nan")]
             .apply(lambda x: x.split(sep))
         )
+        # remove 'nan' term
+        gene_terms = gene_terms.apply(lambda x: [t for t in x if t != 'nan'])
 
         all_gene_set_terms = pd.DataFrame(
             index=set([l for subl in gene_terms.loc[gene_set].values for l in subl])
@@ -1682,11 +1687,17 @@ def enrichment_test(
             x = (
                 gene_terms[gene_set].apply(lambda x: term in x).sum()
             )  # number of test proteins with the term
-            M = len(gene_terms)  # number of background proteins
+            if background is not None:
+                M = len(background) # number of background proteins
+            else:
+                M = len(gene_terms)  # number of background proteins
             N = len(gene_set)  # number of test proteins
-            n = gene_terms.apply(
-                lambda x: term in x
-            ).sum()  # number of background proteins with the term
+            if background is not None:
+                n = background[cat].str.contains(term, regex=False).sum() # number of background proteins with the term
+            else:
+                n = gene_terms.apply(
+                    lambda x: term in x
+                ).sum()  # number of background proteins with the term
             p = hypergeom.sf(x - 1, M, n, N)
             expected = n / M * N
             enrichment = x / expected
