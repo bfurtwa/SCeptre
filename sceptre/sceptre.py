@@ -1683,6 +1683,9 @@ def enrichment_test(
         all_gene_set_terms = pd.DataFrame(
             index=set([l for subl in gene_terms.loc[gene_set].values for l in subl])
         )
+        # skip if all_gene_set_terms is empty
+        if len(all_gene_set_terms) == 0:
+            continue
         for term in all_gene_set_terms.index:
             x = (
                 gene_terms[gene_set].apply(lambda x: term in x).sum()
