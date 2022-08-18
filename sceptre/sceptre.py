@@ -332,7 +332,7 @@ def plot_set_overview(dataset: Mapping, figsize: Tuple[float, float] = (figwd, 1
         .apply(np.log10)
     )
     group_data.columns = [x.split(" ")[1] for x in group_data.columns]
-    rowlength = int(grouped.ngroups / 3)
+    rowlength = int(np.ceil(grouped.ngroups / 3))
     fig, axs = plt.subplots(
         nrows=rowlength,
         ncols=3,
@@ -345,6 +345,11 @@ def plot_set_overview(dataset: Mapping, figsize: Tuple[float, float] = (figwd, 1
     targets = zip(grouped.groups.keys(), axs.flatten())
     for i, (key, ax) in enumerate(targets):
         group_data.loc[key, :].plot.bar(ax=ax, grid=True, title=key)
+
+    # remove empty axes
+    empty_axis = len(grouped.groups.keys()) - len(axs.flatten())
+    for i in range(empty_axis, 0):
+        axs.flat[-1].set_visible(False)
 
 
 def print_ms_stats(dataset: Mapping, s_c_channels: Sequence[str]):
