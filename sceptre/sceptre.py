@@ -405,6 +405,9 @@ def print_ms_stats(dataset: Mapping, s_c_channels: Sequence[str]):
             round(dataset["psms"]["Abundance 126"].median(), 3)
         )
     )
+    # counting number of protein IDs per file depends on version of Proteome Discoverer
+    # in version 2 missing proteins are "Not Found", in version 3 NaN
+    major_pd_version = int(dataset["files"]["Software Revision"][0].split(".")[0])
     nums = []
     for f in dataset["psms"]["File ID"].unique():
         df = dataset["proteins"][
@@ -413,7 +416,10 @@ def print_ms_stats(dataset: Mapping, s_c_channels: Sequence[str]):
                 & dataset["proteins"].columns.str.contains(f)
             ]
         ]
-        nums.append((df != "Not Found").apply(any, axis=1).sum())
+        if major_pd_version < 3:
+            nums.append((df != "Not Found").apply(any, axis=1).sum())
+        else:
+            nums.append(pd.isna(df).apply(any, axis=1).sum())
     print("Mean protein IDs per file: {}".format(round(np.mean(nums), 3)))
 
 
