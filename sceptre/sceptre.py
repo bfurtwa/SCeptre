@@ -749,6 +749,10 @@ def calculate_cell_filter(
             if i == 1:
                 ax.axhline(min_proteins, color="black", linestyle="--")
 
+        # make sure that x-axis is shared. Needed for files with 0 proteins
+        axs[0].get_shared_x_axes().join(axs[0], axs[1])
+        axs[1].autoscale()
+
         axs[2].set_visible(False)
 
         # plot after filter
