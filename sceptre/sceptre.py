@@ -349,7 +349,7 @@ def plot_set_overview(dataset: Mapping, figsize: Tuple[float, float] = (figwd, 1
     # remove empty axes
     empty_axis = len(grouped.groups.keys()) - len(axs.flatten())
     for i in range(empty_axis, 0):
-        axs.flat[-1].set_visible(False)
+        axs.flat[i].set_visible(False)
 
 
 def print_ms_stats(dataset: Mapping, s_c_channels: Sequence[str]):
