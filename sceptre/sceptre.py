@@ -779,7 +779,7 @@ def calculate_cell_filter(
             color=scatter_labels[0],
             size=cellsize,
             show=False,
-            title="Cell filter by Channel",
+            title="Cell filter by {}".format(scatter_labels[0]),
             ax=axs[0],
         )
         axs[0].axvline(sum_sn_max, color="black", linestyle="--")
@@ -793,7 +793,7 @@ def calculate_cell_filter(
             color=scatter_labels[1],
             size=cellsize,
             show=False,
-            title="Cell filter by Population",
+            title="Cell filter by {}".format(scatter_labels[1]),
             ax=axs[1],
         )
         axs[1].axvline(sum_sn_max, color="black", linestyle="--")
