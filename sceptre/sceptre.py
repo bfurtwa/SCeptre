@@ -534,6 +534,7 @@ def normalize(
     iter_thresh: float = 1.1,
     na_thresh: Optional[float] = 1.1,
     drop_na: bool = True,
+    ignore_channel: Optional[str] = None
 ):
     """Normalize expression values in AnnData object.
     The median expression of each protein is equalized across files/channels
@@ -558,6 +559,9 @@ def normalize(
         If not None, replace expression values below this value with 0.
     drop_na
         Drop proteins with no expression values (i.e. 0)
+    ignore_channel
+        Channel to ignore for channel normalization, calculation of file medians and
+        stopping criterion (iter_thresh). Only for 'file_channel'.
     Returns
     -------
     :obj:`None`
@@ -577,7 +581,7 @@ def normalize(
             quant_0 = quant.copy()
             # file bias normalization
             # calculate median for each protein in each sample
-            med = quant.T.reset_index().groupby("File ID").median().T
+            med = quant.loc[: , quant.columns.get_level_values(1) != ignore_channel].T.reset_index().groupby("File ID").median().T
             # calculate the factors needed for a median shift
             med_tot = med.median(axis=1)
             factors = med.divide(med_tot, axis=0)
@@ -588,17 +592,27 @@ def normalize(
 
             # channel bias normalization
             # calculate median for each protein in each channel
-            med = quant.T.reset_index().groupby("Channel").median().T
+            med = quant.loc[: , quant.columns.get_level_values(1) != ignore_channel].T.reset_index().groupby("Channel").median().T
+
             # calculate the factors needed for a median shift
             med_tot = med.median(axis=1)
             factors = med.divide(med_tot, axis=0)
+            if ignore_channel != None:
+                factors[ignore_channel] = 1
 
             quant = quant.groupby(axis=1, level=1).apply(
                 lambda x: x.divide(factors.loc[:, x.name], axis=0)
             )
 
             # stop iterating when the change in quant to the previous iteration is below iter_thresh
-            if (abs(quant - quant_0).max().max()) <= iter_thresh:
+            if (
+                abs(
+                    quant.loc[: , quant.columns.get_level_values(1) != ignore_channel].T
+                    - quant_0.loc[: , quant.columns.get_level_values(1) != ignore_channel].T
+                )
+                .max()
+                .max()
+            ) <= iter_thresh:
                 break
         print("performed {} iterations".format(i + 1))
 
