@@ -581,7 +581,11 @@ def normalize(
             quant_0 = quant.copy()
             # file bias normalization
             # calculate median for each protein in each sample
+            if ignore_channel == None:
+                med = quant.T.reset_index().groupby("File ID").median().T
+            else:
             med = quant.loc[: , quant.columns.get_level_values(1) != ignore_channel].T.reset_index().groupby("File ID").median().T
+
             # calculate the factors needed for a median shift
             med_tot = med.median(axis=1)
             factors = med.divide(med_tot, axis=0)
@@ -592,6 +596,9 @@ def normalize(
 
             # channel bias normalization
             # calculate median for each protein in each channel
+            if ignore_channel == None:
+                med = quant.T.reset_index().groupby("Channel").median().T
+            else:
             med = quant.loc[: , quant.columns.get_level_values(1) != ignore_channel].T.reset_index().groupby("Channel").median().T
 
             # calculate the factors needed for a median shift
