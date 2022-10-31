@@ -15,34 +15,6 @@ import logging
 import seaborn as sns
 import warnings
 
-# output scanpy logs
-logging.basicConfig(level=logging.INFO)
-sc.settings.verbosity = 3
-# don´t show this numpy warning
-warnings.filterwarnings("ignore", message="All-NaN slice encountered")
-
-# basic plotting settings
-plt.rcParams["xtick.labelsize"] = 8
-plt.rcParams["ytick.labelsize"] = 8
-plt.rcParams["font.size"] = 8
-plt.rcParams["font.family"] = "sans-serif"
-plt.rcParams["font.sans-serif"] = "Arial"
-plt.rcParams["figure.figsize"] = 7.2, 4.45
-plt.rcParams["figure.titlesize"] = 9
-plt.rcParams["figure.dpi"] = 120
-plt.rcParams["axes.titlesize"] = 9
-plt.rcParams["axes.labelsize"] = 8
-plt.rcParams["axes.axisbelow"] = True
-plt.rcParams["axes.linewidth"] = 0.5
-plt.rcParams["lines.linewidth"] = 0.7
-plt.rcParams["lines.markersize"] = 2
-plt.rcParams["legend.fontsize"] = 8
-plt.rcParams["boxplot.flierprops.marker"] = "."
-plt.rcParams["boxplot.flierprops.markerfacecolor"] = "k"
-plt.rcParams["boxplot.flierprops.markersize"] = 2
-plt.rcParams["pdf.fonttype"] = 42  # to make pdf text available for illustrator
-plt.rcParams["ps.fonttype"] = 42  # to make pdf text available for illustrator
-
 figwd = 7.2  # standard figure width
 cellsize = 20  # size to plot cells
 wspace = 1  # space between scanpy plots to make room for legends
