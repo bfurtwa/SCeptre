@@ -1063,16 +1063,20 @@ def impute(adata: AnnData, **kwargs):
 
     Updates `adata` with the imputed expression values.
     """
-    if 0 in adata.X:
-        from sklearn.impute import KNNImputer
-
-        imputer = KNNImputer(missing_values=0, **kwargs)
-        if (adata.X == 0).all(axis=0).any():
-            print("remove all-zero proteins:")
-            sc.pp.filter_genes(adata, min_cells=1)
-        adata.X = imputer.fit_transform(adata.X)
+    if np.isnan(adata.X).any():
+        missing_values = np.nan
+    elif 0 in adata.X:
+        missing_values = 0
     else:
         warnings.warn("No zeros in adata")
+        return
+
+    from sklearn.impute import KNNImputer
+    imputer = KNNImputer(missing_values=missing_values, **kwargs)
+    sc.pp.filter_genes(adata, min_cells=1)
+    adata.X = imputer.fit_transform(adata.X)
+
+
 
 
 def find_embedding_params(
