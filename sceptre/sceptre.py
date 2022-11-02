@@ -540,7 +540,8 @@ def normalize(
     quant = pd.DataFrame(
         adata.X.T.copy(),
         columns=adata.obs[["File ID", "Channel"]]
-        .set_index(["File ID", "Channel"])
+        .reset_index()
+        .set_index(["index", "File ID", "Channel"])
         .index,
     ).replace(0, np.nan)
 
@@ -554,7 +555,7 @@ def normalize(
             med_tot = med.median(axis=1)
             factors = med.divide(med_tot, axis=0)
 
-            quant = quant.groupby(axis=1, level=0).apply(
+            quant = quant.groupby(axis=1, level="File ID", group_keys=False).apply(
                 lambda x: x.divide(factors.loc[:, x.name], axis=0)
             )
 
@@ -565,7 +566,7 @@ def normalize(
             med_tot = med.median(axis=1)
             factors = med.divide(med_tot, axis=0)
 
-            quant = quant.groupby(axis=1, level=1).apply(
+            quant = quant.groupby(axis=1, level="Channel", group_keys=False).apply(
                 lambda x: x.divide(factors.loc[:, x.name], axis=0)
             )
 
@@ -583,7 +584,7 @@ def normalize(
         med_tot = med.median(axis=1)
         factors = med.divide(med_tot, axis=0)
 
-        quant = quant.groupby(axis=1, level=0).apply(
+        quant = quant.groupby(axis=1, level="File ID", group_keys=False).apply(
             lambda x: x.divide(factors.loc[:, x.name], axis=0)
         )
 
@@ -596,7 +597,7 @@ def normalize(
         med_tot = med.median(axis=1)
         factors = med.divide(med_tot, axis=0)
 
-        quant = quant.groupby(axis=1, level=1).apply(
+        quant = quant.groupby(axis=1, level="Channel", group_keys=False).apply(
             lambda x: x.divide(factors.loc[:, x.name], axis=0)
         )
 
