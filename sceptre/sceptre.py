@@ -1098,8 +1098,8 @@ def highly_variable_genes(adata: AnnData,
                           max_disp: float = np.inf,
                           min_mean: float = 1,
                           max_mean: float = 10,
-                          min_cluster_coverage: float = 0.3,
-                          min_coverage: int = 1):
+                          min_cluster_coverage: float = 0.3
+                          ):
     """Find highly variable proteins in `adata`
     Expects log data including missing values as 0.
     Uses mean intensity bin - normalized dispersion to select highly
@@ -1121,9 +1121,7 @@ def highly_variable_genes(adata: AnnData,
     max_mean
         Maximum mean expression
     min_cluster_coverage
-        Minimum coverage in cluster to count the cluster
-    min_coverage
-        Minimum number of clusters counted for a protein to pass the filter
+        Minimum coverage in at least 1 cluster
     Returns
     -------
     :obj:`None`
@@ -1152,19 +1150,19 @@ def highly_variable_genes(adata: AnnData,
     sc.pp.pca(ad, use_highly_variable=False)
     sc.pp.neighbors(ad)
     sc.tl.leiden(ad, resolution=2)
-    # number of clusters with at least min_cluster_coverage
-    var['cluster_coverage'] = (
-                (~pd.DataFrame(x, index=ad.obs['leiden'], columns=ad.var_names).isna()).reset_index().groupby(
-                    'leiden').mean() > min_cluster_coverage).sum().astype(float)
+    # coverage of cluster with highest coverage
+    var['max_cluster_coverage'] = (~pd.DataFrame(x,
+                                                 index=ad.obs['leiden'],
+                                                 columns=ad.var_names).isna()).reset_index().groupby('leiden').mean().max().astype(float)
 
     # is highly variable?
     var['highly_variable'] = (
                 (var['means'] > min_mean) & (var['means'] < max_mean) & (var['dispersions_norm'] > min_disp) & (
                     var['dispersions_norm'] < max_disp) & (~var['dispersions_norm'].isna()) & (
-                        var['cluster_coverage'] >= min_coverage))
+                        var['max_cluster_coverage'] >= min_cluster_coverage))
 
-    adata.var.loc[:, ['highly_variable', 'means', 'dispersions', 'dispersions_norm', 'cluster_coverage']] = var[
-        ['highly_variable', 'means', 'dispersions', 'dispersions_norm', 'cluster_coverage']]
+    adata.var.loc[:, ['highly_variable', 'means', 'dispersions', 'dispersions_norm', 'max_cluster_coverage']] = var[
+        ['highly_variable', 'means', 'dispersions', 'dispersions_norm', 'max_cluster_coverage']]
 
 
 def plot_highly_variable_genes(adata: AnnData):
@@ -1182,7 +1180,7 @@ def plot_highly_variable_genes(adata: AnnData):
     axs = axs.flatten()
     var = adata.var.copy()
     var['dispersions_norm'] = var['dispersions_norm'].fillna(0)  # set 0 for plotting
-    sns.scatterplot(var, x='means', y='dispersions_norm', hue='cluster_coverage', ax=axs[0])
+    sns.scatterplot(var, x='means', y='dispersions_norm', hue='max_cluster_coverage', ax=axs[0])
     sns.move_legend(axs[0], "lower center", bbox_to_anchor=(.5, 1), ncol=3, frameon=False)
     sns.scatterplot(var, x='means', y='dispersions_norm', hue='highly_variable', ax=axs[1])
 
