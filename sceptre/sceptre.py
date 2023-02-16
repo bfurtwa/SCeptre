@@ -1147,7 +1147,7 @@ def local_coverage(adata: AnnData, resolution: float = 2):
     """
     ad = adata.copy()
     print('imputing...')
-    spt.impute(ad)
+    impute(ad)
     sc.pp.pca(ad, use_highly_variable=False)
     sc.pp.neighbors(ad)
     sc.tl.leiden(ad, resolution=resolution)
