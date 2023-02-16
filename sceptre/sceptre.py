@@ -1146,14 +1146,15 @@ def local_coverage(adata: AnnData, resolution: float = 2):
     Updates `adata.var` with max_cluster_coverage
     """
     ad = adata.copy()
+    x = ad.X.copy()
     print('imputing...')
     impute(ad)
     sc.pp.pca(ad, use_highly_variable=False)
     sc.pp.neighbors(ad)
     sc.tl.leiden(ad, resolution=resolution)
     # number of clusters with at least min_cluster_coverage
-    ad.var['max_cluster_coverage'] = (
-        ~pd.DataFrame(ad.X, index=ad.obs['leiden'], columns=ad.var_names).isna()).reset_index().groupby(
+    ad.var['max_cluster_coverage'] = (pd.DataFrame(x, index=ad.obs['leiden'],
+                                                   columns=ad.var_names) != 0).reset_index().groupby(
         'leiden').mean().max().astype(float)
 
     adata.var.loc[:, ['max_cluster_coverage']] = ad.var['max_cluster_coverage']
