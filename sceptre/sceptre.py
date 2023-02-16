@@ -1092,19 +1092,10 @@ def impute(adata: AnnData, **kwargs):
         warnings.warn("No zeros in adata")
 
 
-def highly_variable_genes(adata: AnnData,
-                          bins: int = 10,
-                          min_disp: float = 0.01,
-                          max_disp: float = np.inf,
-                          min_mean: float = 1,
-                          max_mean: float = 10,
-                          min_cluster_coverage: float = 0.3
-                          ):
-    """Find highly variable proteins in `adata`
+def normalized_dispersion(adata: AnnData, bins: int = 10):
+    """Calculates the normalized dispersion of each protein in `adata`
     Expects log data including missing values as 0.
-    Uses mean intensity bin - normalized dispersion to select highly
-    variable protein from each intensity bin. Filters on local coverage
-    by clustering the data and filtering on coverage in each cluster.
+    Dispersion (variance/mean) is calculated and normalized (z-score) by mean intensity bin.
 
     Parameters
     ----------
@@ -1112,26 +1103,16 @@ def highly_variable_genes(adata: AnnData,
         The annotated data matrix.
     bins
         The number of intensity bins.
-    min_disp
-        Minimum normalized dispersion
-    max_disp
-        Maximum normalized dispersion
-    min_mean
-        Minimum mean expression
-    max_mean
-        Maximum mean expression
-    min_cluster_coverage
-        Minimum coverage in at least 1 cluster
     Returns
     -------
     :obj:`None`
 
-    Updates `adata.var` with highly variable annotation.
+    Updates `adata.var` with means, dispersions & dispersions_norm.
     """
     x = adata.X.copy()
     var = adata.var.copy()
 
-    # normalized dispersion
+    # normalized dispersion, ignoring missing values
     x[x == 0] = np.nan
     var['means'] = np.nanmean(x, 0)
     var['variances'] = np.nanvar(x, 0)
@@ -1143,46 +1124,40 @@ def highly_variable_genes(adata: AnnData,
                     left_on='expression_bin', right_index=True)
     var['dispersions_norm'] = (var['dispersions'] - var['mean_dispersion_in_bin']) / var['std_dispersion_in_bin']
 
-    # local coverage
-    ad = adata.copy()
-    print('imputing...')
-    spt.impute(ad)
-    sc.pp.pca(ad, use_highly_variable=False)
-    sc.pp.neighbors(ad)
-    sc.tl.leiden(ad, resolution=2)
-    # coverage of cluster with highest coverage
-    var['max_cluster_coverage'] = (~pd.DataFrame(x,
-                                                 index=ad.obs['leiden'],
-                                                 columns=ad.var_names).isna()).reset_index().groupby('leiden').mean().max().astype(float)
-
-    # is highly variable?
-    var['highly_variable'] = (
-                (var['means'] > min_mean) & (var['means'] < max_mean) & (var['dispersions_norm'] > min_disp) & (
-                    var['dispersions_norm'] < max_disp) & (~var['dispersions_norm'].isna()) & (
-                        var['max_cluster_coverage'] >= min_cluster_coverage))
-
-    adata.var.loc[:, ['highly_variable', 'means', 'dispersions', 'dispersions_norm', 'max_cluster_coverage']] = var[
-        ['highly_variable', 'means', 'dispersions', 'dispersions_norm', 'max_cluster_coverage']]
+    adata.var.loc[:, ['means', 'dispersions', 'dispersions_norm']] = var[['means', 'dispersions', 'dispersions_norm']]
+    print('added means, dispersions & dispersions_norm to adata.var')
 
 
-def plot_highly_variable_genes(adata: AnnData):
-    """Plot highly variable proteins.
+def local_coverage(adata: AnnData, resolution: float = 2):
+    """Calculates the maximum coverage of each protein across clusters.
+    Expects log data including missing values as 0.
+    Data is imputed, embedded and clustered. The highest coverage in any cluster is reported.
 
     Parameters
     ----------
     adata
         The annotated data matrix.
+    resolution
+        The resolution for leiden clustering.
     Returns
     -------
     :obj:`None`
+
+    Updates `adata.var` with max_cluster_coverage
     """
-    fig, axs = plt.subplots(2, 1, figsize=(4, 4), sharex=True, sharey=True)
-    axs = axs.flatten()
-    var = adata.var.copy()
-    var['dispersions_norm'] = var['dispersions_norm'].fillna(0)  # set 0 for plotting
-    sns.scatterplot(var, x='means', y='dispersions_norm', hue='max_cluster_coverage', ax=axs[0])
-    sns.move_legend(axs[0], "lower center", bbox_to_anchor=(.5, 1), ncol=3, frameon=False)
-    sns.scatterplot(var, x='means', y='dispersions_norm', hue='highly_variable', ax=axs[1])
+    ad = adata.copy()
+    print('imputing...')
+    spt.impute(ad)
+    sc.pp.pca(ad, use_highly_variable=False)
+    sc.pp.neighbors(ad)
+    sc.tl.leiden(ad, resolution=resolution)
+    # number of clusters with at least min_cluster_coverage
+    ad.var['max_cluster_coverage'] = (
+        ~pd.DataFrame(ad.X, index=ad.obs['leiden'], columns=ad.var_names).isna()).reset_index().groupby(
+        'leiden').mean().max().astype(float)
+
+    adata.var.loc[:, ['max_cluster_coverage']] = ad.var['max_cluster_coverage']
+    print('added max_cluster_coverage to adata.var')
 
 
 def find_embedding_params(
