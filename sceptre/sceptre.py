@@ -1092,7 +1092,7 @@ def impute(adata: AnnData, **kwargs):
         warnings.warn("No zeros in adata")
 
 
-def normalized_dispersion(adata: AnnData, bins: int = 10):
+def normalized_dispersion(adata: AnnData, bins: int = 10, var_subset: Sequence[str] = None):
     """Calculates the normalized dispersion of each protein in `adata`
     Expects log data including missing values as 0.
     Dispersion (variance/mean) is calculated and normalized (z-score) by mean intensity bin.
@@ -1103,6 +1103,9 @@ def normalized_dispersion(adata: AnnData, bins: int = 10):
         The annotated data matrix.
     bins
         The number of intensity bins.
+    var_subset
+        List of proteins to subset adata.var to normalize dispersions.
+        Useful to e.g. not consider low coverage proteins.
     Returns
     -------
     :obj:`None`
@@ -1118,10 +1121,19 @@ def normalized_dispersion(adata: AnnData, bins: int = 10):
     var['variances'] = np.nanvar(x, 0)
     var['dispersions'] = var['variances'] / var['means']
     var['expression_bin'] = pd.cut(var['means'], bins)
-    var = var.merge(var.groupby('expression_bin')['dispersions'].mean().rename('mean_dispersion_in_bin'),
-                    left_on='expression_bin', right_index=True)
-    var = var.merge(var.groupby('expression_bin')['dispersions'].std().rename('std_dispersion_in_bin'),
-                    left_on='expression_bin', right_index=True)
+    if var_subset is not None:
+        var = var.merge(
+            var.loc[var_subset].groupby('expression_bin')['dispersions'].mean().rename('mean_dispersion_in_bin'),
+            left_on='expression_bin', right_index=True)
+        var = var.merge(
+            var.loc[var_subset].groupby('expression_bin')['dispersions'].std().rename('std_dispersion_in_bin'),
+            left_on='expression_bin', right_index=True)
+    else:
+        var = var.merge(var.groupby('expression_bin')['dispersions'].mean().rename('mean_dispersion_in_bin'),
+                        left_on='expression_bin', right_index=True)
+        var = var.merge(var.groupby('expression_bin')['dispersions'].std().rename('std_dispersion_in_bin'),
+                        left_on='expression_bin', right_index=True)
+
     var['dispersions_norm'] = (var['dispersions'] - var['mean_dispersion_in_bin']) / var['std_dispersion_in_bin']
 
     adata.var.loc[:, ['means', 'dispersions', 'dispersions_norm']] = var[['means', 'dispersions', 'dispersions_norm']]
