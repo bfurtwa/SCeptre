@@ -1751,7 +1751,8 @@ def enrichment_test(
     else:
         ad = adata
 
-    results = pd.DataFrame()
+    results = pd.DataFrame(columns=["size", "background", "# in background", "size subset", "# in subset",
+                                    "expected", "enrichment", "pval", "pvals_adj", "Category"])
     for cat in categories:
         gene_terms = (
             ad.var[cat]
