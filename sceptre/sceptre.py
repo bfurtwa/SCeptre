@@ -332,7 +332,7 @@ def plot_set_overview(dataset: Mapping, figsize: Tuple[float, float] = (figwd, 1
         .apply(np.log10)
     )
     group_data.columns = [x.split(" ")[1] for x in group_data.columns]
-    rowlength = int(grouped.ngroups / 3)
+    rowlength = int(np.ceil(grouped.ngroups / 3))
     fig, axs = plt.subplots(
         nrows=rowlength,
         ncols=3,
@@ -345,6 +345,11 @@ def plot_set_overview(dataset: Mapping, figsize: Tuple[float, float] = (figwd, 1
     targets = zip(grouped.groups.keys(), axs.flatten())
     for i, (key, ax) in enumerate(targets):
         group_data.loc[key, :].plot.bar(ax=ax, grid=True, title=key)
+
+    # remove empty axes
+    empty_axis = len(grouped.groups.keys()) - len(axs.flatten())
+    for i in range(empty_axis, 0):
+        axs.flat[i].set_visible(False)
 
 
 def print_ms_stats(dataset: Mapping, s_c_channels: Sequence[str]):
@@ -400,6 +405,8 @@ def print_ms_stats(dataset: Mapping, s_c_channels: Sequence[str]):
             round(dataset["psms"]["Abundance 126"].median(), 3)
         )
     )
+    # counting number of protein IDs per file depends on version of Proteome Discoverer
+    # in version 2 missing proteins are "Not Found", in version 3 NaN
     nums = []
     for f in dataset["psms"]["File ID"].unique():
         df = dataset["proteins"][
@@ -408,7 +415,7 @@ def print_ms_stats(dataset: Mapping, s_c_channels: Sequence[str]):
                 & dataset["proteins"].columns.str.contains(f)
             ]
         ]
-        nums.append((df != "Not Found").apply(any, axis=1).sum())
+        nums.append(((df != "Not Found") & (~pd.isna(df))).apply(any, axis=1).sum())
     print("Mean protein IDs per file: {}".format(round(np.mean(nums), 3)))
 
 
@@ -742,6 +749,10 @@ def calculate_cell_filter(
             if i == 1:
                 ax.axhline(min_proteins, color="black", linestyle="--")
 
+        # make sure that x-axis is shared. Needed for files with 0 proteins
+        axs[0].get_shared_x_axes().join(axs[0], axs[1])
+        axs[1].autoscale()
+
         axs[2].set_visible(False)
 
         # plot after filter
@@ -768,7 +779,7 @@ def calculate_cell_filter(
             color=scatter_labels[0],
             size=cellsize,
             show=False,
-            title="Cell filter by Channel",
+            title="Cell filter by {}".format(scatter_labels[0]),
             ax=axs[0],
         )
         axs[0].axvline(sum_sn_max, color="black", linestyle="--")
@@ -782,7 +793,7 @@ def calculate_cell_filter(
             color=scatter_labels[1],
             size=cellsize,
             show=False,
-            title="Cell filter by Population",
+            title="Cell filter by {}".format(scatter_labels[1]),
             ax=axs[1],
         )
         axs[1].axvline(sum_sn_max, color="black", linestyle="--")
