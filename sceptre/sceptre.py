@@ -1716,14 +1716,15 @@ def plot_de_heatmap(
 
 
 def enrichment_test(
-    adata: AnnData,
-    gene_set: Sequence[str],
-    categories: Sequence[str],
-    background: Union[pd.DataFrame, None] = None,
-    sep: str = ";",
-    key: str = "enrichment_test",
-    pval_thesh: float = 0.05,
-    use_raw: bool = True,
+        adata: AnnData,
+        gene_set: Sequence[str],
+        categories: Sequence[str],
+        background: Union[pd.DataFrame, None] = None,
+        sep: str = ";",
+        key: str = "enrichment_test",
+        pval_thesh: float = 0.05,
+        adjust_each_category: bool = True,
+        use_raw: bool = True,
 ):
     """Perform a term enrichment test on the selected genes in selected term category.
     If no background is provided, all genes in the matrix are used as background.
@@ -1745,6 +1746,8 @@ def enrichment_test(
         The key under which the results are stored in `adata.uns`.
     pval_thesh
         Filter the output table based on the adjusted p-value.
+    adjust_each_category
+        Calculate adjusted p-value for each category separately.
     use_raw
         Use genes in 'adata.raw'.
     Returns
@@ -1768,7 +1771,7 @@ def enrichment_test(
         gene_terms = (
             ad.var[cat]
             .astype(str)[~(ad.var[cat] == "nan")]
-            .apply(lambda x: x.split(sep))
+            .apply(lambda x: [y.strip() for y in x.split(sep)])
         )
         # remove 'nan' term
         gene_terms = gene_terms.apply(lambda x: [t for t in x if t != 'nan'])
@@ -1784,12 +1787,12 @@ def enrichment_test(
                 gene_terms[gene_set].apply(lambda x: term in x).sum()
             )  # number of test proteins with the term
             if background is not None:
-                M = len(background) # number of background proteins
+                M = len(background)  # number of background proteins
             else:
                 M = len(gene_terms)  # number of background proteins
             N = len(gene_set)  # number of test proteins
             if background is not None:
-                n = background[cat].str.contains(term, regex=False).sum() # number of background proteins with the term
+                n = background[cat].str.contains(term, regex=False).sum()  # number of background proteins with the term
             else:
                 n = gene_terms.apply(
                     lambda x: term in x
@@ -1810,16 +1813,27 @@ def enrichment_test(
                 ],
             ] = (M, n, N, x, expected, enrichment, p)
 
-        _, pvals_adj, _, _ = multipletests(
-            all_gene_set_terms["pval"], alpha=0.05, method="fdr_bh"
-        )
-        all_gene_set_terms["pvals_adj"] = pvals_adj
-        if pval_thesh:
-            all_gene_set_terms = all_gene_set_terms[
-                all_gene_set_terms["pvals_adj"] <= pval_thesh
-            ]
+        if adjust_each_category:
+            _, pvals_adj, _, _ = multipletests(
+                all_gene_set_terms["pval"], alpha=0.05, method="fdr_bh"
+            )
+            all_gene_set_terms["pvals_adj"] = pvals_adj
+            if pval_thesh:
+                all_gene_set_terms = all_gene_set_terms[
+                    all_gene_set_terms["pvals_adj"] <= pval_thesh
+                    ]
         all_gene_set_terms["Category"] = cat
         results = results.append(all_gene_set_terms)
+
+    if not adjust_each_category:
+        _, pvals_adj, _, _ = multipletests(
+            results["pval"], alpha=0.05, method="fdr_bh"
+        )
+        results["pvals_adj"] = pvals_adj
+        if pval_thesh:
+            results = results[
+                results["pvals_adj"] <= pval_thesh
+                ]
 
     adata.uns[key] = results.sort_values("pvals_adj")
 
