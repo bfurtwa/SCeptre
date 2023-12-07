@@ -1076,6 +1076,41 @@ def plot_facs_qc(
     return figs
 
 
+def median_ratio_norm(adata: AnnData, layer: Union[str, None] = None):
+    """Apply median-ratio normalization.
+    Expects non-log transformed data and missing values to be 0.
+
+    Parameters
+    ----------
+    adata
+        The annotated data matrix.
+    layer
+        The layer that should be normalized.
+        If None, apply to .X
+    Returns
+    -------
+    :obj:`None`
+
+    Updates `adata` with the normalized layer.
+    """
+
+    from scipy.stats import gmean
+
+    if layer is None:
+        x = adata.X.copy()
+    else:
+        x = adata.layers[layer].copy()
+
+    x[x == 0] = np.nan
+
+    gmeans = gmean(x, axis=0, nan_policy='omit')
+    s_facs = np.nanmedian(x / gmeans, axis=1)
+
+    x = x / s_facs[:, None]
+    x[np.isnan(x)] = 0
+    adata.layers[layer] = x.copy()
+
+
 def impute(adata: AnnData, **kwargs):
     """Impute missing values in `adata`
 
