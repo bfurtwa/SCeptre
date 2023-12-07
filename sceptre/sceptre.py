@@ -1108,7 +1108,10 @@ def median_ratio_norm(adata: AnnData, layer: Union[str, None] = None):
 
     x = x / s_facs[:, None]
     x[np.isnan(x)] = 0
-    adata.layers[layer] = x.copy()
+    if layer is None:
+        adata.X = x.copy()
+    else:
+        adata.layers[layer] = x.copy()
 
 
 def impute(adata: AnnData, **kwargs):
