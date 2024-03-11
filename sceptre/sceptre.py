@@ -209,7 +209,7 @@ def load_dataset(proteins: str, psms: str, msms: str, files: str, meta: str):
     -------
     A dict containing all required tables.
     """
-    prot = pd.read_table(proteins, low_memory=False)
+    prot = pd.read_table(proteins, low_memory=False, skipinitialspace=True)
     # To use the Gene Symbol as index:
     # Set nan Gene Symbol to protein accession
     # and if Gene Symbol is not unique, add the protein accession to make duplicates unique.
@@ -224,11 +224,11 @@ def load_dataset(proteins: str, psms: str, msms: str, files: str, meta: str):
                 prot.loc[i, "Gene Symbol"] + "_" + prot.loc[i, "Accession"]
             )
 
-    psms = pd.read_table(psms, low_memory=False)
-    msms = pd.read_table(msms, low_memory=False)
-    files = pd.read_table(files, low_memory=False)
+    psms = pd.read_table(psms, low_memory=False, skipinitialspace=True)
+    msms = pd.read_table(msms, low_memory=False, skipinitialspace=True)
+    files = pd.read_table(files, low_memory=False, skipinitialspace=True)
     files["File Name"] = files["File Name"].apply(lambda x: ntpath.basename(x))
-    meta = pd.read_table(meta, low_memory=False)
+    meta = pd.read_table(meta, low_memory=False, skipinitialspace=True)
 
     return {"proteins": prot, "psms": psms, "msms": msms, "files": files, "meta": meta}
 
