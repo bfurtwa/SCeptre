@@ -494,8 +494,8 @@ def dataset_to_scanpy(dataset: Mapping, temp_dir: str = "../results/tmp"):
 
     adata.obs = quant_meta
     prots = dataset["proteins"].copy()
-    prot_anno = prots[
-        [
+    if "KEGG Pathways" in prots.columns:
+        anno_list = [
             "Accession",
             "Gene Symbol",
             "Description",
@@ -506,7 +506,18 @@ def dataset_to_scanpy(dataset: Mapping, temp_dir: str = "../results/tmp"):
             "Reactome Pathways",
             "WikiPathways",
         ]
-    ]
+    else:
+        anno_list = [
+            "Accession",
+            "Gene Symbol",
+            "Description",
+            "Biological Process",
+            "Cellular Component",
+            "Molecular Function",
+            "Reactome Pathways",
+            "WikiPathways",
+        ]
+    prot_anno = prots[anno_list]
     # object columns to category for .var
     prot_anno = pd.concat(
         [
