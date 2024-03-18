@@ -209,7 +209,7 @@ def load_dataset(proteins: str, psms: str, msms: str, files: str, meta: str):
     -------
     A dict containing all required tables.
     """
-    prot = pd.read_table(proteins, low_memory=False)
+    prot = pd.read_table(proteins, low_memory=False, skipinitialspace=True)
     # To use the Gene Symbol as index:
     # Set nan Gene Symbol to protein accession
     # and if Gene Symbol is not unique, add the protein accession to make duplicates unique.
@@ -224,11 +224,11 @@ def load_dataset(proteins: str, psms: str, msms: str, files: str, meta: str):
                 prot.loc[i, "Gene Symbol"] + "_" + prot.loc[i, "Accession"]
             )
 
-    psms = pd.read_table(psms, low_memory=False)
-    msms = pd.read_table(msms, low_memory=False)
-    files = pd.read_table(files, low_memory=False)
+    psms = pd.read_table(psms, low_memory=False, skipinitialspace=True)
+    msms = pd.read_table(msms, low_memory=False, skipinitialspace=True)
+    files = pd.read_table(files, low_memory=False, skipinitialspace=True)
     files["File Name"] = files["File Name"].apply(lambda x: ntpath.basename(x))
-    meta = pd.read_table(meta, low_memory=False)
+    meta = pd.read_table(meta, low_memory=False, skipinitialspace=True)
 
     return {"proteins": prot, "psms": psms, "msms": msms, "files": files, "meta": meta}
 
@@ -494,8 +494,8 @@ def dataset_to_scanpy(dataset: Mapping, temp_dir: str = "../results/tmp"):
 
     adata.obs = quant_meta
     prots = dataset["proteins"].copy()
-    prot_anno = prots[
-        [
+    if "KEGG Pathways" in prots.columns:
+        anno_list = [
             "Accession",
             "Gene Symbol",
             "Description",
@@ -506,7 +506,18 @@ def dataset_to_scanpy(dataset: Mapping, temp_dir: str = "../results/tmp"):
             "Reactome Pathways",
             "WikiPathways",
         ]
-    ]
+    else:
+        anno_list = [
+            "Accession",
+            "Gene Symbol",
+            "Description",
+            "Biological Process",
+            "Cellular Component",
+            "Molecular Function",
+            "Reactome Pathways",
+            "WikiPathways",
+        ]
+    prot_anno = prots[anno_list]
     # object columns to category for .var
     prot_anno = pd.concat(
         [
@@ -1076,6 +1087,44 @@ def plot_facs_qc(
     return figs
 
 
+def median_ratio_norm(adata: AnnData, layer: Union[str, None] = None):
+    """Apply median-ratio normalization.
+    Expects non-log transformed data and missing values to be 0.
+
+    Parameters
+    ----------
+    adata
+        The annotated data matrix.
+    layer
+        The layer that should be normalized.
+        If None, apply to .X
+    Returns
+    -------
+    :obj:`None`
+
+    Updates `adata` with the normalized layer.
+    """
+
+    from scipy.stats import gmean
+
+    if layer is None:
+        x = adata.X.copy()
+    else:
+        x = adata.layers[layer].copy()
+
+    x[x == 0] = np.nan
+
+    gmeans = gmean(x, axis=0, nan_policy='omit')
+    s_facs = np.nanmedian(x / gmeans, axis=1)
+
+    x = x / s_facs[:, None]
+    x[np.isnan(x)] = 0
+    if layer is None:
+        adata.X = x.copy()
+    else:
+        adata.layers[layer] = x.copy()
+
+
 def impute(adata: AnnData, **kwargs):
     """Impute missing values in `adata`
 
@@ -1635,14 +1684,15 @@ def plot_de_heatmap(
 
 
 def enrichment_test(
-    adata: AnnData,
-    gene_set: Sequence[str],
-    categories: Sequence[str],
-    background: Union[pd.DataFrame, None] = None,
-    sep: str = ";",
-    key: str = "enrichment_test",
-    pval_thesh: float = 0.05,
-    use_raw: bool = True,
+        adata: AnnData,
+        gene_set: Sequence[str],
+        categories: Sequence[str],
+        background: Union[pd.DataFrame, None] = None,
+        sep: str = ";",
+        key: str = "enrichment_test",
+        pval_thesh: float = 0.05,
+        adjust_each_category: bool = True,
+        use_raw: bool = True,
 ):
     """Perform a term enrichment test on the selected genes in selected term category.
     If no background is provided, all genes in the matrix are used as background.
@@ -1664,6 +1714,8 @@ def enrichment_test(
         The key under which the results are stored in `adata.uns`.
     pval_thesh
         Filter the output table based on the adjusted p-value.
+    adjust_each_category
+        Calculate adjusted p-value for each category separately.
     use_raw
         Use genes in 'adata.raw'.
     Returns
@@ -1681,12 +1733,13 @@ def enrichment_test(
     else:
         ad = adata
 
-    results = pd.DataFrame()
+    results = pd.DataFrame(columns=["size background", "# in background", "size subset", "# in subset",
+                                    "expected", "enrichment", "pval", "pvals_adj", "Category"])
     for cat in categories:
         gene_terms = (
             ad.var[cat]
             .astype(str)[~(ad.var[cat] == "nan")]
-            .apply(lambda x: x.split(sep))
+            .apply(lambda x: [y.strip() for y in x.split(sep)])
         )
         # remove 'nan' term
         gene_terms = gene_terms.apply(lambda x: [t for t in x if t != 'nan'])
@@ -1702,12 +1755,12 @@ def enrichment_test(
                 gene_terms[gene_set].apply(lambda x: term in x).sum()
             )  # number of test proteins with the term
             if background is not None:
-                M = len(background) # number of background proteins
+                M = len(background)  # number of background proteins
             else:
                 M = len(gene_terms)  # number of background proteins
             N = len(gene_set)  # number of test proteins
             if background is not None:
-                n = background[cat].str.contains(term, regex=False).sum() # number of background proteins with the term
+                n = background[cat].str.contains(term, regex=False).sum()  # number of background proteins with the term
             else:
                 n = gene_terms.apply(
                     lambda x: term in x
@@ -1728,16 +1781,27 @@ def enrichment_test(
                 ],
             ] = (M, n, N, x, expected, enrichment, p)
 
-        _, pvals_adj, _, _ = multipletests(
-            all_gene_set_terms["pval"], alpha=0.05, method="fdr_bh"
-        )
-        all_gene_set_terms["pvals_adj"] = pvals_adj
-        if pval_thesh:
-            all_gene_set_terms = all_gene_set_terms[
-                all_gene_set_terms["pvals_adj"] <= pval_thesh
-            ]
+        if adjust_each_category:
+            _, pvals_adj, _, _ = multipletests(
+                all_gene_set_terms["pval"], alpha=0.05, method="fdr_bh"
+            )
+            all_gene_set_terms["pvals_adj"] = pvals_adj
+            if pval_thesh:
+                all_gene_set_terms = all_gene_set_terms[
+                    all_gene_set_terms["pvals_adj"] <= pval_thesh
+                    ]
         all_gene_set_terms["Category"] = cat
         results = results.append(all_gene_set_terms)
+
+    if not adjust_each_category:
+        _, pvals_adj, _, _ = multipletests(
+            results["pval"], alpha=0.05, method="fdr_bh"
+        )
+        results["pvals_adj"] = pvals_adj
+        if pval_thesh:
+            results = results[
+                results["pvals_adj"] <= pval_thesh
+                ]
 
     adata.uns[key] = results.sort_values("pvals_adj")
 
