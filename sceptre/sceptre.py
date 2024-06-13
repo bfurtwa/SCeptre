@@ -15,34 +15,6 @@ import logging
 import seaborn as sns
 import warnings
 
-# output scanpy logs
-logging.basicConfig(level=logging.INFO)
-sc.settings.verbosity = 3
-# don´t show this numpy warning
-warnings.filterwarnings("ignore", message="All-NaN slice encountered")
-
-# basic plotting settings
-plt.rcParams["xtick.labelsize"] = 8
-plt.rcParams["ytick.labelsize"] = 8
-plt.rcParams["font.size"] = 8
-plt.rcParams["font.family"] = "sans-serif"
-plt.rcParams["font.sans-serif"] = "Arial"
-plt.rcParams["figure.figsize"] = 7.2, 4.45
-plt.rcParams["figure.titlesize"] = 9
-plt.rcParams["figure.dpi"] = 120
-plt.rcParams["axes.titlesize"] = 9
-plt.rcParams["axes.labelsize"] = 8
-plt.rcParams["axes.axisbelow"] = True
-plt.rcParams["axes.linewidth"] = 0.5
-plt.rcParams["lines.linewidth"] = 0.7
-plt.rcParams["lines.markersize"] = 2
-plt.rcParams["legend.fontsize"] = 8
-plt.rcParams["boxplot.flierprops.marker"] = "."
-plt.rcParams["boxplot.flierprops.markerfacecolor"] = "k"
-plt.rcParams["boxplot.flierprops.markersize"] = 2
-plt.rcParams["pdf.fonttype"] = 42  # to make pdf text available for illustrator
-plt.rcParams["ps.fonttype"] = 42  # to make pdf text available for illustrator
-
 figwd = 7.2  # standard figure width
 cellsize = 20  # size to plot cells
 wspace = 1  # space between scanpy plots to make room for legends
@@ -579,7 +551,8 @@ def normalize(
     quant = pd.DataFrame(
         adata.X.T.copy(),
         columns=adata.obs[["File ID", "Channel"]]
-        .set_index(["File ID", "Channel"])
+        .reset_index()
+        .set_index(["index", "File ID", "Channel"])
         .index,
     ).replace(0, np.nan)
 
@@ -593,7 +566,7 @@ def normalize(
             med_tot = med.median(axis=1)
             factors = med.divide(med_tot, axis=0)
 
-            quant = quant.groupby(axis=1, level=0).apply(
+            quant = quant.groupby(axis=1, level="File ID", group_keys=False).apply(
                 lambda x: x.divide(factors.loc[:, x.name], axis=0)
             )
 
@@ -604,7 +577,7 @@ def normalize(
             med_tot = med.median(axis=1)
             factors = med.divide(med_tot, axis=0)
 
-            quant = quant.groupby(axis=1, level=1).apply(
+            quant = quant.groupby(axis=1, level="Channel", group_keys=False).apply(
                 lambda x: x.divide(factors.loc[:, x.name], axis=0)
             )
 
@@ -622,7 +595,7 @@ def normalize(
         med_tot = med.median(axis=1)
         factors = med.divide(med_tot, axis=0)
 
-        quant = quant.groupby(axis=1, level=0).apply(
+        quant = quant.groupby(axis=1, level="File ID", group_keys=False).apply(
             lambda x: x.divide(factors.loc[:, x.name], axis=0)
         )
 
@@ -635,7 +608,7 @@ def normalize(
         med_tot = med.median(axis=1)
         factors = med.divide(med_tot, axis=0)
 
-        quant = quant.groupby(axis=1, level=1).apply(
+        quant = quant.groupby(axis=1, level="Channel", group_keys=False).apply(
             lambda x: x.divide(factors.loc[:, x.name], axis=0)
         )
 
@@ -1140,16 +1113,20 @@ def impute(adata: AnnData, **kwargs):
 
     Updates `adata` with the imputed expression values.
     """
-    if 0 in adata.X:
-        from sklearn.impute import KNNImputer
-
-        imputer = KNNImputer(missing_values=0, **kwargs)
-        if (adata.X == 0).all(axis=0).any():
-            print("remove all-zero proteins:")
-            sc.pp.filter_genes(adata, min_cells=1)
-        adata.X = imputer.fit_transform(adata.X)
+    if np.isnan(adata.X).any():
+        missing_values = np.nan
+    elif 0 in adata.X:
+        missing_values = 0
     else:
         warnings.warn("No zeros in adata")
+        return
+
+    from sklearn.impute import KNNImputer
+    imputer = KNNImputer(missing_values=missing_values, **kwargs)
+    sc.pp.filter_genes(adata, min_cells=1)
+    adata.X = imputer.fit_transform(adata.X)
+
+
 
 
 def find_embedding_params(
